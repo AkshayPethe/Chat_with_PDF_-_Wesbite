@@ -4,6 +4,7 @@ from DS_Modules.pdf_reader import Pdf_Reader
 from langchain_core.messages import AIMessage, HumanMessage
 from DS_Modules.websiteparse import  get_text_for_url
 from DS_Modules.vectorstore import vectorstore_pdf, vectorstore_url
+from dotenv import load_env
 
 
 
@@ -14,6 +15,7 @@ def get_response(user_input):
     return "I dont Know"
 
 def main():
+    load_env()
     # App config
     st.set_page_config(page_title="Chat with PDF and Websites")
     st.title("Chat with Websites and PDFs")
@@ -27,7 +29,6 @@ def main():
         if choice == "Upload PDF":
             pdf_docs = st.file_uploader("Choose a PDF file", type="pdf")
             st.write("Successfully uploaded PDF!")
-            st.write("You uploaded a file named:", pdf_docs.name)
             process_pdf = st.button("Process PDF")
             if process_pdf:
                 with st.spinner("Processing.Please Wait..."):
