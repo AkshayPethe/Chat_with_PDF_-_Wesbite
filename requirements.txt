@@ -3,4 +3,16 @@ streamlit
 langchain_community
 openai
 PyPDF2
+unstructured[all-docs]
+pypiwin32
+pillow 
+pydantic 
+lxml 
+pillow 
+matplotlib 
+chromadb 
+tiktoken 
+watermark
+pdfminer.six 
+pytesseract
 #dotenv
