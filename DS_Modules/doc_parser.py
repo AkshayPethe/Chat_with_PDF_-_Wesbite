@@ -1,80 +1,81 @@
 import tabula
 from unstructured.partition.pdf import partition_pdf
 
-# def get_text_for_url(website_url):
-#     try:
-#         loader = WebBaseLoader(website_url)
-#         documents = loader.load()
-    
-#     except requests.exceptions.RequestException as e:
-#         print(f"Error loading URL: {e}")
-#         return None
-    
-#     return documents
-
-# Assuming the file exists at the specified path
-path = r"C:\Users\asus\OneDrive\Desktop\GenAI\AdvancedRag\ast_sci_data_tables_sample.pdf"
-image_path = r"C:\Users\asus\OneDrive\Desktop\GenAI\AdvancedRag\Images"
-
-
-
-
-def extract_pdf_data(path, image_path):
-    """Extracts text and tables from a PDF, saving images to a specified directory.
+def extract_pdf_data(path):
+    """Extracts text and tables from a PDF, saving images to a specified directory (optional).
 
     Args:
         path (str): Path to the PDF file.
         image_path (str): Path to the directory for storing extracted images (optional).
 
     Returns:
-        tuple: A tuple containing two lists:
-            - text (list): A list of strings containing the extracted text elements.
-            - tables (list): A list of dataframes extracted from the PDF tables using `tabula`.
+        list: A list containing the extracted elements from the PDF (potentially including text and table data).
 
     Raises:
         Exception: If an error occurs during PDF processing.
     """
 
     try:
-     
-        tables = tabula.read_pdf(
+        tables_tab = tabula.read_pdf(
             path,
-            multiple_tables=True,  
-            lattice=True,     
-            pandas_options={'dtype': str}, # Ensure string data type for tables
-            pages = 'all'  
+            multiple_tables=True,
+            lattice=True,
+            pandas_options={'dtype': str},  # Ensure string data type for tables
+            pages='all'
         )
-
 
         raw_pdf_elements = partition_pdf(
             filename=path,
-            extract_images_in_pdf=bool(image_path), 
-            image_output_dir_path=image_path,
+            extract_images_in_pdf=True,
             # Adjust chunking and combining options as needed
             chunking_strategy="by_title",
-            max_characters=4000,
-            new_after_n_chars=3800,
-            combine_text_under_n_chars=2000
+            max_characters=2000,
+            new_after_n_chars=1800,
+            combine_text_under_n_chars=500
         )
 
-        text = []
-        for element in raw_pdf_elements:
-            if "unstructured.documents.elements.CompositeElement" in str(type(element)):
-                text.append(str(element))
-            else:
-                text = []
-
-        return text, tables
+        return tables_tab,raw_pdf_elements
 
     except Exception as e:
         print(f"Error occurred while extracting data from PDF: {e}")
-        return [], []  # Return empty lists on error
+        return [] 
+
+
+
+def data_category(raw_pdf_elements):
+    """Categorizes extracted PDF elements into tables and text.
+
+    Args:
+        raw_pdf_elements (list): List of elements extracted from the PDF using partition_pdf.
+
+    Returns:
+        list: A list containing two sub-lists:
+            - texts (list): List of extracted text elements.
+            - tables (list): List of extracted tables (converted to strings).
+    """
+
+    tables = []
+    texts = []
+    for element in raw_pdf_elements:
+        if "unstructured.documents.elements.Table" in str(type(element)):
+            tables.append(str(element))
+        elif "unstructured.documents.elements.CompositeElement" in str(type(element)):
+            texts.append(str(element))
+    data_category = [texts,tables]      
+
+    return texts
+
 
 if __name__ == "__main__":
-    path =r"C:\Users\asus\OneDrive\Desktop\GenAI\AdvancedRag\ast_sci_data_tables_sample.pdf"  # Replace with the actual path to your PDF
-    image_path = r"C:\Users\asus\OneDrive\Desktop\GenAI\AdvancedRag\Images"  # Optional path for extracted images (if desired)
+    path = r"C:\Users\asus\OneDrive\Desktop\GenAI\AdvancedRag\ast_sci_data_tables_sample.pdf"
+    image_path = r"C:\Users\asus\OneDrive\Desktop\GenAI\AdvancedRag\Images"
 
-    text, tables = extract_pdf_data(path, image_path)
+    tables,raw_pdf_elements = extract_pdf_data(path)
+    print("a")
+
+    # Unpack the returned list from data_category
+    text = data_category(raw_pdf_elements)
+    print("b")
 
     # Process the extracted text and tables as needed
     print("Extracted Text:")
@@ -83,7 +84,4 @@ if __name__ == "__main__":
 
     print("\nExtracted Tables:")
     for table in tables:
-        print(table.to_string())
-
-
-
+        print(table.to_string())  # Assuming tables are DataFrames, use to_string
