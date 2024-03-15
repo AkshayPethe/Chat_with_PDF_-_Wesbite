@@ -64,7 +64,12 @@ def data_category(raw_pdf_elements):
     data_category = [texts,tables]      
 
     return texts
+"""Disadvantges of Tabula is that 1.when the library identifies the different 
+rows of the table using the line-break special character \n in the table’s text.
 
+2.the extracted information is outputted in a Pandas DataFrame instead of a string. 
+In most cases, this can be a desirable format but in the case of transformers that take into account text, 
+these results need to be transformed before feeding into a model."""
 
 if __name__ == "__main__":
     path = r"C:\Users\asus\OneDrive\Desktop\GenAI\AdvancedRag\ast_sci_data_tables_sample.pdf"
