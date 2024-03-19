@@ -27,18 +27,10 @@ def text_extract(element):
       A tuple containing (extracted text, list of unique line formats). """
 
     line_text = element.get_text()  #Method of LTTEContrainer which extract words within the corpus box and store in a list
-    
-    line_formats = []
-
     for text_line in element:
         if isinstance(text_line,LTTextContainer):
-
-            for char in text_line:
-                if isinstance(char,LTChar):
-                    line_formats.append(char.fontname)
-                    line_formats.append(char.size)
-
-    format_per_line = list(set(line_formats))
+            line_format = [(char.fontname,char.size) for char in text_line if isinstance(char,LTChar)]
+    format_per_line = list(set(line_format))
     return (line_text, format_per_line)
 
 
@@ -58,7 +50,7 @@ def crop_image(element,pageObj):
     pageObj.mediabox.upper_right = (image_right,image_top)
 
     #Saving the image PDF
-    cropped_pdf_writter = PyPDF2.PDFWriter()
+    cropped_pdf_writter = PyPDF2.PdfWriter()
     cropped_pdf_writter.add_page(pageObj)
 
     with open('cropped_image.pdf','wb') as cropped_pdf_file:
@@ -69,7 +61,7 @@ def convert_to_image(input_file):
     """Converts PDF file to Image"""
     images = convert_from_path(input_file)
     image = images[0]
-    output_file = "PDF_Image.pdf"
+    output_file = "PDF_Image.png"
     image.save(output_file,"PNG")
 
 
@@ -92,6 +84,10 @@ So when text of column goes to other line it identifies it as row with NaN Colum
 In most cases, this can be a desirable format but in the case of transformers that take into account text, 
 these results need to be transformed before feeding into a model."""
 
+
+
+
+
 def extract_tables(pdf_path,page_num,table_num):
     """1.Opens PDF from path navigates to the page_num 
     2.From the list of tables found on page by pdfplummber we select desired one
@@ -110,71 +106,108 @@ def extract_tables(pdf_path,page_num,table_num):
 
 
 def table_converter(table):
-
+    
     """1.We iterate in each nested list and clean its context from any unwanted line breaks coming from any wrapped text.
       2.We join each element of the row by separating them using the | symbol to create the structure of a table’s cell.
       3.Finally, we add a line break at the end to move to the next row."""
-    table_string =''
 
-    for row_num in range(len(table)):
-        row = table[row_num]
+    table_string = ''
 
-        processed_row = [item.replace('\n',' ') if item not None and '\n' in item else 'None' if item is None for else item for item in row ]
-        """For Example row = ["This is cell 1", "Cell 2\nwith a newline", None] then 
-         processed_row = ["This is cell 1", "Cell 2 with a newline", "None"]"""
-        
-        table_string+=('|'+'|'.join(processed_row)+ '|'+'\n')
-        table_string = table_string[:-1]
-        return table_string
+    for row_num,row in enumerate(table):
+        processed_row = [item.replace('\n', ' ') if item is not None and '\n' in item else 'None' if item is None else item for item in row]
+
+        table_string += ('|' + '|'.join(processed_row) + '|' + '\n')
+
+    table_string = table_string[:-1]  # Remove the last newline character
+
+    return table_string
     
 
 #Adding All the Functions Together
     
-pdf_path = r"C:\Users\asus\OneDrive\Desktop\GenAI\AdvancedRag\somatosensory.pdf"
-pdfFileObj = open(pdf_path,'rb')
-read_pdf = PyPDF2.PdfReader(pdfFileObj)
 
-text_per_page = {}
-pdf_path = r"C:\Users\asus\OneDrive\Desktop\GenAI\AdvancedRag\somatosensory.pdf"
-for pagenum,page in enumerate(extract_pages(pdf_path)):
+def final_extraction(pdf_path):
+    text_per_page = {}
+    with open(pdf_path,'rb') as pdf_file:
+        read_pdf = PyPDF2.PdfReader(pdf_file)
+    
+        
+        for pagenum, page in enumerate(extract_pages(pdf_path)):
+            pageObj = read_pdf.pages[pagenum]
+            page_text,line_format,text_from_image,text_from_tables,page_content= [],[],[],[],[]
+             
+            table_num = 0
+            first_element = True
+            table_extraction_flag = False
+            
+            pdf = pdfplumber.open(pdf_path) #For Table Extraction
+            page_tables = pdf.pages[pagenum]
+            tables = page_tables.find_tables()
+            
+            # Find the elements in PDF Object for each page.
+            page_elements = [(element.y1, element) for element in page._objs]
+            page_elements.sort(key=lambda x: x[0], reverse=True)  
+            """Sorting Acc to element.y1 as it ensure text is being shown as it is in PDF
+            From Top to Bottom using y1 = top cordinate of element
+            """
+            for i, component in enumerate(page_elements):
+                pos = component[0]  # Extracting Top Positions of Element
+                element = component[1]
+                
+                if isinstance(element, LTTextContainer): #For Text in PDF
+                    print("Found text container:", element)
+                    (line_text, format_per_line) = text_extract(element)
+                    page_text.append(line_text)
+                    line_format.append(format_per_line)
+                    page_content.append(line_text)
 
-    pageObj = read_pdf.pages[pagenum]
-    page_text = []
-    line_format = []
-    text_from_image = []
-    text_from_tables = []
-    page_content = []
+                elif isinstance(element, LTFigure):
+                    print("Found figure:", element)
+                    crop_image(element, pageObj)
+                    convert_to_image('cropped_image.pdf')
+                    image_text = image_to_text("PDF_Image.png")
+                    text_from_image.append(image_text)
+                    page_content.append(image_text)
 
-    table_num = 0
-    first_element = True
-    table_extraction = False
+                elif isinstance(element, LTRect): #For Tables
+                    if first_element == True and (table_num+1)<=len(tables):
+                        print(page.bbox[3])
+                        lower_side = page.bbox[3] - tables[table_num].bbox[3]
+                        upper_side = element.y1
+                        table = extract_tables(pdf_path,pagenum,table_num)
+                        table_string = table_converter(table)
 
-    pdf = pdfplumber.open(pdf_path)
-    page_tables = pdf.pages[pagenum]
-    tables = page_tables.find_tables()
+                        text_from_tables.append(table_string)
+                        page_content.append(table_string)
 
-    print(page_tables)
+                        table_extraction_flag = True
+                        first_element = False
+                    # Check if we already extracted the tables from the page
+                    if element.y0 >=lower_side and element.y1<=upper_side:
+                        pass
+                    elif not isinstance(page_elements[i+1][1],LTFRect):
+                        table_extraction_flag = False
+                        first_element = True
+                        table_num+=1
+
+                    
+            # Add the extracted data to the dictionary
+            text_per_page[pagenum] = {
+                "page_text": page_text,
+                "text_from_image": text_from_image,
+                "text_from_tables": text_from_tables,
+                "page_content": page_content}
+        
+        return text_per_page
+print(page.bbox[3])
+pdf_path = r"C:\Users\asus\OneDrive\Desktop\GenAI\AdvancedRag\ast_sci_data_tables_sample.pdf"
+extracted_data = final_extraction(pdf_path)
 
 
+# Process the extracted data (image, line_format_text, page_text) based on your needs
+# print(f"Image text: {image}")
+print(f"Extraction: {extracted_data}")
 
-
-    """LTFigure which represents the area of the PDF that can present figures or 
-images that have been embedded as another PDF document in the page.
-LTTextContainer which represents a group of text lines in a rectangular area is 
-then analysed further into a list of LTTextLine objects. Each one of them represents a list of 
-LTChar objects, which store the single characters of text along with their metadata. (5)
-LTRect represents a 2-dimensional rectangle that can be used to frame images, and 
-figures or create tables in an LTPage object."""
-
-    if isinstance(element,LTTextContainer):  #isinstance checks if elememt is LTTextContainer type
-        #Function to extract the text from the text block
-
-
-        #Function to extract the text format pass
-
-    # if isinstance(element,LTFigure):
-
-    #     #Function to convert PDFImage to PNG
 
     #     #Function to extract text from Images with OCR pass
 
@@ -191,8 +224,7 @@ figures or create tables in an LTPage object."""
 
 
 
-
-
+            
 
 
 
