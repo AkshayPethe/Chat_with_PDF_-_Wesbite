@@ -26,7 +26,8 @@ def text_extract(element):
     Returns:
       A tuple containing (extracted text, list of unique line formats). """
 
-    line_text = element.get_text()  #Method of LTTEContrainer which extract words within the corpus box and store in a list
+    line_text = element.get_text() #Method of LTTEContrainer which extract words within the corpus box and store in a list
+    line_format = []  
     for text_line in element:
         if isinstance(text_line,LTTextContainer):
             line_format = [(char.fontname,char.size) for char in text_line if isinstance(char,LTChar)]
@@ -88,22 +89,24 @@ these results need to be transformed before feeding into a model."""
 
 
 
-def extract_tables(pdf_path,page_num,table_num):
-    """1.Opens PDF from path navigates to the page_num 
-    2.From the list of tables found on page by pdfplummber we select desired one
-    3.We extract the content of the table and output it in a list of nested lists representing each row of the table.
+def extract_tables(pdf_path, page_num, table_num):
+    """Extracts tables from the PDF.
+    
+    Args:
+        pdf_path (str): The path to the PDF file.
+        page_num (int): The page number containing the table.
+        table_num (int): The index of the table on the page.
+    
+    Returns:
+        list: The extracted table as a list of lists.
     """
-
     pdf = pdfplumber.open(pdf_path)
-
-    #Find the examined Page
-    table_page = pdf.pages(page_num)
-
-    #Extract the appropriate table
-    table = table.extract_table()[table_num]
-
+    # Find the examined Page
+    table_page = pdf.pages[page_num]
+    # Extract the appropriate table
+    tables = table_page.extract_tables()
+    table = tables[table_num]
     return table
-
 
 def table_converter(table):
     
@@ -178,14 +181,14 @@ def final_extraction(pdf_path):
                         table_string = table_converter(table)
 
                         text_from_tables.append(table_string)
-                        page_content.append(table_string)
+                        
 
                         table_extraction_flag = True
                         first_element = False
                     # Check if we already extracted the tables from the page
                     if element.y0 >=lower_side and element.y1<=upper_side:
                         pass
-                    elif not isinstance(page_elements[i+1][1],LTFRect):
+                    elif not isinstance(page_elements[i+1][1],LTRect):
                         table_extraction_flag = False
                         first_element = True
                         table_num+=1
@@ -196,26 +199,19 @@ def final_extraction(pdf_path):
                 "page_text": page_text,
                 "text_from_image": text_from_image,
                 "text_from_tables": text_from_tables,
-                "page_content": page_content}
+                }
         
         return text_per_page
-print(page.bbox[3])
-pdf_path = r"C:\Users\asus\OneDrive\Desktop\GenAI\AdvancedRag\ast_sci_data_tables_sample.pdf"
+
+pdf_path = r"C:\Users\asus\OneDrive\Desktop\GenAI\AdvancedRag\invoicesample.pdf"
 extracted_data = final_extraction(pdf_path)
 
 
-# Process the extracted data (image, line_format_text, page_text) based on your needs
-# print(f"Image text: {image}")
+
+page_number = 0
 print(f"Extraction: {extracted_data}")
 
 
-    #     #Function to extract text from Images with OCR pass
-
-    # if isinstance(element,LTRect):
-
-    #     #Function to extract table pass
-
-    #     #Function to convert Table Content to String
 
 
 
@@ -224,7 +220,7 @@ print(f"Extraction: {extracted_data}")
 
 
 
-            
+
 
 
 

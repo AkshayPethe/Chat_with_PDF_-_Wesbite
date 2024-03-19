@@ -1,10 +1,6 @@
 import os
-
+from langchain_community.llms import CTransformers
 from unstructured.partition.pdf import partition_pdf
-
-
-# Assuming the file exists at the specified path
-
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
@@ -12,7 +8,7 @@ from langchain.schema.output_parser import StrOutputParser #Takes Ouptput from m
 
 load_dotenv()
 openai_api_key = os.getenv("OPENAI_API_KEY")
-
+huggingfacehub_api = os.getenv("HUGGINGFACEHUB_API_TOKEN")
 
 def table_summarize(tables):
     prompt_text = """You are an assistant tasked with summarizing tables. \
@@ -25,11 +21,23 @@ def table_summarize(tables):
 
     return table_summaries
 
+# def table_summarize(tables):
+#     prompt_text = """You are an assistant tasked with summarizing tables. \
+#                     Give a concise summary of the table.Also Summarize each datapoint in a table. Table chunk: {element} """
+
+#     prompt = ChatPromptTemplate.from_template(prompt_text)
+#     model = CTransformers(model="mistral-7b-instruct-v0.1.Q4_K_M.gguf",config={'max_new_tokens': 128, 'temperature': 0.01})
+#     summarize_chain = {"element": lambda x: x} | prompt | model | StrOutputParser()
+#     table_summaries = summarize_chain.batch(tables, {"max_concurrency": 5})
+
+#     return table_summaries
+
+
 
 
 
 image_path = r"C:\Users\asus\OneDrive\Desktop\GenAI\AdvancedRag\Images"
-path = r"C:\Users\asus\OneDrive\Desktop\GenAI\AdvancedRag\ast_sci_data_tables_sample.pdf"
+path = r"C:\Users\asus\OneDrive\Desktop\GenAI\AdvancedRag\WM17S.pdf"
 raw_pdf_elements = partition_pdf(
     filename=path,
     extract_images_in_pdf=True,
@@ -72,6 +80,10 @@ table_summarize = table_summarize(tables)
 print("*"*50)
 print(table_summarize)
 print("*"*50)
-print(tables)
+print(tables[6])
 print("*"*50)
 print(texts)
+print("*"*50)
+print(len(tables))
+
+print(tables[1])
