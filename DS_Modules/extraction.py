@@ -142,6 +142,8 @@ def final_extraction(pdf_path):
             table_num = 0
             first_element = True
             table_extraction_flag = False
+            lower_side = 0
+            upper_side = 0
             
             pdf = pdfplumber.open(pdf_path) #For Table Extraction
             page_tables = pdf.pages[pagenum]
@@ -162,7 +164,7 @@ def final_extraction(pdf_path):
                     (line_text, format_per_line) = text_extract(element)
                     page_text.append(line_text)
                     line_format.append(format_per_line)
-                    page_content.append(line_text)
+                    
 
                 elif isinstance(element, LTFigure):
                     print("Found figure:", element)
@@ -170,7 +172,7 @@ def final_extraction(pdf_path):
                     convert_to_image('cropped_image.pdf')
                     image_text = image_to_text("PDF_Image.png")
                     text_from_image.append(image_text)
-                    page_content.append(image_text)
+                    
 
                 elif isinstance(element, LTRect): #For Tables
                     if first_element == True and (table_num+1)<=len(tables):
@@ -203,13 +205,8 @@ def final_extraction(pdf_path):
         
         return text_per_page
 
-pdf_path = r"C:\Users\asus\OneDrive\Desktop\GenAI\AdvancedRag\invoicesample.pdf"
+pdf_path = r"C:\Users\asus\OneDrive\Desktop\GenAI\AdvancedRag\document-3a31866.pdf"
 extracted_data = final_extraction(pdf_path)
-
-
-
-page_number = 0
-print(f"Extraction: {extracted_data}")
 
 
 
