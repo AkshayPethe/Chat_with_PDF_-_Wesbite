@@ -1,0 +1,17 @@
+<h3>3.4 Human annotation collection</h3><p>Annotator Task We incorporate an outcome-level relative assessment (ORA) for human evaluations.
+This comparative method, as described by [29], operates on assumptions about the rationality of human judgment, commonly employed in LLM evaluations [2]: Generate pairs with outputs from two systems, have annotators select their preferred choice from each pair, and calculate a preferencebased score to evaluate system performance.</p><p>In this work, we create random pairs containing completions from models A and B and ask the annotators to select which model’s output they prefer or whether there is a tie between the models.
+Our annotation guidelines follow a set of robust evaluation criteria focusing on task fulfillment, grammatical correctness, semantic coherence, and the naturalness of responses, as detailed in Appendix A.2.
+The completions generated from a predetermined set of prompts are randomly assigned as either option A or option B in the interface.
+This random assignment prevents any potential bias that might arise if annotators consistently favor one position over the other.</p><p>Random Baseline The procedure we follow to establish a baseline for comparison between two models involves presenting prompts P = {pi}Ni=1 to annotators in a random order and subsequently collecting annotations.
+To establish a reliable baseline, we take the average across Nperms unique sequence permutations.
+This technique accounts for the inherent variability when different sequences yield varying tie outcomes for the top k% data selections.
+We compare the tie rates of random sequences, averaged over Nperms, against rankings based on both KL divergence (KL) and CrossEntropy (CE) at varying top k percentiles.
+An effective metric that aptly measures the dissimilarity between two completions should manifest as reduced tie rates, particularly in the earliest, highestranked annotations.</p><p>Aggregation of Preferences For each unique “A vs. B” model comparison experiment, we collect Nevals pairwise human preference data.
+Each experiment benefits from the input of up to 10 annotators, yielding binary ranking outcomes.
+Given the subjective nature of the task and the diverse perspectives of the annotators, we observe some intra-annotator disagreement in our experiments (on average 70% agreements between annotators).
+To accommodate for this variability, we implement a soft voting aggregation mechanism [24].
+Soft voting, often used in ensemble machine learning models, works by averaging the class probabilities of the individual annotators instead of relying on the majority count.
+This approach is beneficial in scenarios where there is high variability in annotator responses, as it captures a more nuanced view of the collective decision-making process.
+We consider cases where there is an equal vote count for both models or when the annotators select the “both good” or “both bad” option as tie outcomes.
+With soft voting, we incorporate a threshold on the averaged scores to define a tie, adding a degree of flexibility to account for close outcomes between the two models under consideration.
+Examining the distribution of disagreements for each experiment, we chose a threshold of 0.2 for comparing models within the same family and 0.1 when comparing models from different families.</p>

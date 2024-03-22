@@ -15,4 +15,5 @@ tiktoken
 watermark
 pdfminer.six 
 pytesseract
+llmsherpa
 #dotenv
