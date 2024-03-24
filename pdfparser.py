@@ -1,91 +1,232 @@
-from llmsherpa.readers import LayoutPDFReader
-from pdfminer.high_level import extract_pages
-from pdfminer.layout import LTTextContainer, LTFigure
+# To read the PDF
+import PyPDF2
+# To analyze the PDF layout and extract text
+from pdfminer.high_level import extract_pages, extract_text
+from pdfminer.layout import LTTextContainer, LTChar, LTRect, LTFigure
+# To extract text from tables in PDF
 import pdfplumber
-from pdf2image import convert_from_path
+# To extract the images from the PDFs
 from PIL import Image
-import pytesseract
+from pdf2image import convert_from_path
+# To perform OCR to extract text from images 
+import pytesseract 
 
-def extract_text_llmsherpa(pdf_url):
+import os
+
+"""https://towardsdatascience.com/extracting-text-from-pdf-files-with-python-a-comprehensive-guide-9fc4003d517"""
+
+# Function to Extract Text
+def text_extract(pdf_url_text):
+
+    """Extracts text from the corpus, Checking if text is in LTTextContainer and LTChar.If yes extracting format for line
+
+     Args:
+      element: The element from which to extract text and line formats.
+
+    Returns:
+      A tuple containing (extracted text, list of unique line formats). """
+
     llmsherpa_api_url = "https://readers.llmsherpa.com/api/document/developer/parseDocument?renderFormat=all"
+    pdf_url = pdf_url_text 
     pdf_reader = LayoutPDFReader(llmsherpa_api_url)
     doc = pdf_reader.read_pdf(pdf_url)
-    text_per_page = {}
+    documents = [[chunks.to_text()] for chunks in doc.chunks()]
+    return documents
+  
 
-    for page_num, page in enumerate(doc.get_pages()):
-        page_text = [chunk.to_text() for chunk in page.chunks()]
-        text_per_page[page_num] = {"page_text": page_text}
-    
-    return text_per_page
 
-def extract_tables(pdf_path, page_num, table_num):
-    pdf = pdfplumber.open(pdf_path)
-    table_page = pdf.pages[page_num]
-    tables = table_page.extract_tables()
-    table = tables[table_num]
-    return table
 
-def table_converter(table):
-    table_string = ''
-    for row_num, row in enumerate(table):
-        processed_row = [item.replace('\n', ' ') if item is not None and '\n' in item else 'None' if item is None else item for item in row]
-        table_string += ('|' + '|'.join(processed_row) + '|' + '\n')
-    table_string = table_string[:-1]  # Remove the last newline character
-    return table_string
+
+#For Image Extraction and Text from Images
+def crop_image(element,pageObj):
+    """We use the metadata from the LTFigure object detected from PDFMiner to 
+    crop the image box, utilising its coordinates in the page layout. 
+    We then save it as a new PDF in our directory using the PyPDF2 library."""
+
+    #Coordinates of Image
+    [image_left,image_top,image_right,image_bottom] = element.x0,element.y0,element.x1,element.y1
+    #Cropping the image by using [left,bottom,right,top]
+
+    pageObj.mediabox.lower_left = (image_left,image_bottom)
+    pageObj.mediabox.upper_right = (image_right,image_top)
+
+    #Saving the image PDF
+    cropped_pdf_writter = PyPDF2.PdfWriter()
+    cropped_pdf_writter.add_page(pageObj)
+
+    with open('cropped_image.pdf','wb') as cropped_pdf_file:
+        cropped_pdf_writter.write(cropped_pdf_file)
+
 
 def convert_to_image(input_file):
+    """Converts PDF file to Image"""
     images = convert_from_path(input_file)
     image = images[0]
     output_file = "PDF_Image.png"
     image.save(output_file,"PNG")
 
+
 def image_to_text(image_path):
+    """Extract text from Image by pytesseract"""
+
     img = Image.open(image_path)
     text = pytesseract.image_to_string(img)
     return text
 
-def crop_image(element, pageObj):
-    [image_left, image_top, image_right, image_bottom] = element.x0, element.y0, element.x1, element.y1
-    pageObj.mediabox.lower_left = (image_left, image_bottom)
-    pageObj.mediabox.upper_right = (image_right, image_top)
-    cropped_pdf_writter = PyPDF2.PdfWriter()
-    cropped_pdf_writter.add_page(pageObj)
-    with open('cropped_image.pdf','wb') as cropped_pdf_file:
-        cropped_pdf_writter.write(cropped_pdf_file)
 
-def final_extraction(pdf_url):
-    text_per_page = extract_text_llmsherpa(pdf_url)
-    pdf_path = "temp.pdf"
-    pdf_file = open(pdf_path, 'wb')
-    for page in extract_pages(pdf_url):
-        pdf_file.write(page.encode('utf-8'))
-    pdf_file.close()
+
+#Extracting Text From Tables
+"""We can use Tabula but Disadvantges of Tabula is that 
+1.when the library identifies the different 
+rows of the table using the line-break special character \n in the table’s text.
+So when text of column goes to other line it identifies it as row with NaN Columns
+
+2.the extracted information is outputted in a Pandas DataFrame instead of a string. 
+In most cases, this can be a desirable format but in the case of transformers that take into account text, 
+these results need to be transformed before feeding into a model."""
+
+
+
+
+
+def extract_tables(pdf_path, page_num, table_num):
+    """Extracts tables from the PDF.
     
-    for page_num, page in enumerate(extract_pages(pdf_path)):
-        page_text = [chunk.to_text() for chunk in page.chunks()]
-        text_per_page[page_num]["page_text"] += page_text
+    Args:
+        pdf_path (str): The path to the PDF file.
+        page_num (int): The page number containing the table.
+        table_num (int): The index of the table on the page.
+    
+    Returns:
+        list: The extracted table as a list of lists.
+    """
+    pdf = pdfplumber.open(pdf_path)
+    # Find the examined Page
+    table_page = pdf.pages[page_num]
+    # Extract the appropriate table
+    tables = table_page.extract_tables()
+    table = tables[table_num]
+    return table
+
+def table_converter(table):
+    
+    """1.We iterate in each nested list and clean its context from any unwanted line breaks coming from any wrapped text.
+      2.We join each element of the row by separating them using the | symbol to create the structure of a table’s cell.
+      3.Finally, we add a line break at the end to move to the next row."""
+
+    table_string = ''
+
+    for row_num,row in enumerate(table):
+        processed_row = [item.replace('\n', ' ') if item is not None and '\n' in item else 'None' if item is None else item for item in row]
+
+        table_string += ('|' + '|'.join(processed_row) + '|' + '\n')
+
+    table_string = table_string[:-1]  # Remove the last newline character
+
+    return table_string
+    
+
+#Adding All the Functions Together
+    
+
+def final_extraction(pdf_path):
+
+    # documents = text_extract(pdf_url)
+    # return documents
+    text_per_page = {}
+    with open(pdf_path,'rb') as pdf_file:
+        read_pdf = PyPDF2.PdfReader(pdf_file)
         
-        text_from_image, text_from_tables = [], []
-        pdf = pdfplumber.open(pdf_path)
-        page_tables = pdf.pages[page_num]
+    for pagenum, page in enumerate(extract_pages(pdf_path)):
+        pageObj = read_pdf.pages[pagenum]
+        text_from_image,text_from_tables= [],[]
+            
+        table_num = 0
+        first_element = True
+        table_extraction_flag = False
+        lower_side = 0
+        upper_side = 0
+        
+        pdf = pdfplumber.open(pdf_path) #For Table Extraction
+        page_tables = pdf.pages[pagenum]
         tables = page_tables.find_tables()
-        for i, component in enumerate(page._objs):
-            if isinstance(component, LTFigure):
-                crop_image(component, page)
+        
+        # Find the elements in PDF Object for each page.
+        page_elements = [(element.y1, element) for element in page._objs]
+        page_elements.sort(key=lambda x: x[0], reverse=True)  
+        """Sorting Acc to element.y1 as it ensure text is being shown as it is in PDF
+        From Top to Bottom using y1 = top cordinate of element
+        """
+        for i, component in enumerate(page_elements):
+            pos = component[0]  # Extracting Top Positions of Element
+            element = component[1]
+            if isinstance(element, LTFigure):
+                print("Found figure:", element)
+                crop_image(element, pageObj)
                 convert_to_image('cropped_image.pdf')
                 image_text = image_to_text("PDF_Image.png")
                 text_from_image.append(image_text)
-            elif isinstance(component, LTRect):
-                table = extract_tables(pdf_path, page_num, i)
-                table_string = table_converter(table)
-                text_from_tables.append(table_string)
-        text_per_page[page_num]["text_from_image"] = text_from_image
-        text_per_page[page_num]["text_from_tables"] = text_from_tables
-    
-    return text_per_page
+                
 
-# Example usage:
-pdf_url = r"https://arxiv.org/pdf/2401.05618.pdf"
-extracted_data = final_extraction(pdf_url)
-print("*"*100)
-print(extracted_data[1]["page_text"])
+            elif isinstance(element, LTRect): #For Tables
+                if first_element == True and (table_num+1)<=len(tables):
+                    print(page.bbox[3])
+                    lower_side = page.bbox[3] - tables[table_num].bbox[3]
+                    upper_side = element.y1
+                    table = extract_tables(pdf_path,pagenum,table_num)
+                    table_string = table_converter(table)
+
+                    text_from_tables.append(table_string)
+                    
+
+                    table_extraction_flag = True
+                    first_element = False
+                # Check if we already extracted the tables from the page
+                if element.y0 >=lower_side and element.y1<=upper_side:
+                    pass
+                elif not isinstance(page_elements[i+1][1],LTRect):
+                    table_extraction_flag = False
+                    first_element = True
+                    table_num+=1
+
+                
+        # Add the extracted data to the dictionary
+        text_per_page[pagenum] = {
+            "text_from_image": text_from_image,
+            "text_from_tables": text_from_tables,
+            }
+        
+
+        return text_per_page
+
+
+pdf_url= "https://www.nvidia.com/content/dam/en-zz/Solutions/Data-Center/tesla-t4/t4-tensor-core-product-brief.pdf"
+pdf_path = r"C:\Users\asus\OneDrive\Desktop\GenAI\AdvancedRag\t4-tensor-core-product-brief.pdf"
+
+data = final_extraction(pdf_path)
+# extracted_info,extracted_text = final_extraction(pdf_path,pdf_url)
+# print("Extracted_Data :",extracted_data)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
