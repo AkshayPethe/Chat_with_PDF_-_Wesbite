@@ -1,5 +1,6 @@
 # To read the PDF
 import PyPDF2
+from llmsherpa.readers import LayoutPDFReader
 # To analyze the PDF layout and extract text
 from pdfminer.high_level import extract_pages, extract_text
 from pdfminer.layout import LTTextContainer, LTChar, LTRect, LTFigure
@@ -129,83 +130,87 @@ def table_converter(table):
 #Adding All the Functions Together
     
 
-def final_extraction(pdf_path):
+def final_extraction(pdf_path,pdf_url):
 
-    # documents = text_extract(pdf_url)
-    # return documents
+    documents = text_extract(pdf_url)
+    
     text_per_page = {}
     with open(pdf_path,'rb') as pdf_file:
         read_pdf = PyPDF2.PdfReader(pdf_file)
         
-    for pagenum, page in enumerate(extract_pages(pdf_path)):
-        pageObj = read_pdf.pages[pagenum]
-        text_from_image,text_from_tables= [],[]
-            
-        table_num = 0
-        first_element = True
-        table_extraction_flag = False
-        lower_side = 0
-        upper_side = 0
-        
-        pdf = pdfplumber.open(pdf_path) #For Table Extraction
-        page_tables = pdf.pages[pagenum]
-        tables = page_tables.find_tables()
-        
-        # Find the elements in PDF Object for each page.
-        page_elements = [(element.y1, element) for element in page._objs]
-        page_elements.sort(key=lambda x: x[0], reverse=True)  
-        """Sorting Acc to element.y1 as it ensure text is being shown as it is in PDF
-        From Top to Bottom using y1 = top cordinate of element
-        """
-        for i, component in enumerate(page_elements):
-            pos = component[0]  # Extracting Top Positions of Element
-            element = component[1]
-            if isinstance(element, LTFigure):
-                print("Found figure:", element)
-                crop_image(element, pageObj)
-                convert_to_image('cropped_image.pdf')
-                image_text = image_to_text("PDF_Image.png")
-                text_from_image.append(image_text)
+        for pagenum, page in enumerate(extract_pages(pdf_path)):
+            pageObj = read_pdf.pages[pagenum]
+            text_from_image,text_from_tables= [],[]
                 
-
-            elif isinstance(element, LTRect): #For Tables
-                if first_element == True and (table_num+1)<=len(tables):
-                    print(page.bbox[3])
-                    lower_side = page.bbox[3] - tables[table_num].bbox[3]
-                    upper_side = element.y1
-                    table = extract_tables(pdf_path,pagenum,table_num)
-                    table_string = table_converter(table)
-
-                    text_from_tables.append(table_string)
+            table_num = 0
+            first_element = True
+            table_extraction_flag = False
+            lower_side = 0
+            upper_side = 0
+            
+            pdf = pdfplumber.open(pdf_path) #For Table Extraction
+            page_tables = pdf.pages[pagenum]
+            tables = page_tables.find_tables()
+            
+            # Find the elements in PDF Object for each page.
+            page_elements = [(element.y1, element) for element in page._objs]
+            page_elements.sort(key=lambda x: x[0], reverse=True)  
+            """Sorting Acc to element.y1 as it ensure text is being shown as it is in PDF
+            From Top to Bottom using y1 = top cordinate of element
+            """
+            for i, component in enumerate(page_elements):
+                pos = component[0]  # Extracting Top Positions of Element
+                element = component[1]
+                if isinstance(element, LTFigure):
+                    print("Found figure:", element)
+                    crop_image(element, pageObj)
+                    convert_to_image('cropped_image.pdf')
+                    image_text = image_to_text("PDF_Image.png")
+                    text_from_image.append(image_text)
                     
 
-                    table_extraction_flag = True
-                    first_element = False
-                # Check if we already extracted the tables from the page
-                if element.y0 >=lower_side and element.y1<=upper_side:
-                    pass
-                elif not isinstance(page_elements[i+1][1],LTRect):
-                    table_extraction_flag = False
-                    first_element = True
-                    table_num+=1
+                elif isinstance(element, LTRect): #For Tables
+                    if first_element == True and (table_num+1)<=len(tables):
+                        print(page.bbox[3])
+                        lower_side = page.bbox[3] - tables[table_num].bbox[3]
+                        upper_side = element.y1
+                        table = extract_tables(pdf_path,pagenum,table_num)
+                        table_string = table_converter(table)
 
-                
-        # Add the extracted data to the dictionary
-        text_per_page[pagenum] = {
-            "text_from_image": text_from_image,
-            "text_from_tables": text_from_tables,
-            }
-        
+                        text_from_tables.append(table_string)
+                        
 
-        return text_per_page
+                        table_extraction_flag = True
+                        first_element = False
+                    # Check if we already extracted the tables from the page
+                    if element.y0 >=lower_side and element.y1<=upper_side:
+                        pass
+                    elif not isinstance(page_elements[i+1][1],LTRect):
+                        table_extraction_flag = False
+                        first_element = True
+                        table_num+=1
+
+                    
+            # Add the extracted data to the dictionary
+            text_per_page[pagenum] = {
+                "text_from_image": text_from_image,
+                "text_from_tables": text_from_tables,
+                }
+            
+        Documents = documents.append(text_per_page)
+            
+
+        return Documents
 
 
 pdf_url= "https://www.nvidia.com/content/dam/en-zz/Solutions/Data-Center/tesla-t4/t4-tensor-core-product-brief.pdf"
 pdf_path = r"C:\Users\asus\OneDrive\Desktop\GenAI\AdvancedRag\t4-tensor-core-product-brief.pdf"
+print("*"*100)
+data = final_extraction(pdf_path,pdf_url)
+print("Data of Text and Images:",data)
 
-data = final_extraction(pdf_path)
-# extracted_info,extracted_text = final_extraction(pdf_path,pdf_url)
-# print("Extracted_Data :",extracted_data)
+print(data)
+
 
 
 
