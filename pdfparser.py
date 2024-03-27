@@ -214,9 +214,11 @@ print(data)
 
 
 
-
-
-
+from llama_index.core import VectorStoreIndex, SimpleDirectoryReader,Document
+path = r'C:\Users\asus\OneDrive\Desktop\GenAI\AdvancedRag\2307.06435.pdf'
+documents = SimpleDirectoryReader(path).load_data()
+print(len(documents))
+print(documents)
 
 
 
