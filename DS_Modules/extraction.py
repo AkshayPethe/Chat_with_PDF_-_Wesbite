@@ -11,9 +11,7 @@ from PIL import Image
 from pdf2image import convert_from_path
 # To perform OCR to extract text from images 
 import pytesseract 
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from llama_index.core import Settings
-from llama_index.core import VectorStoreIndex,Document
+
 
 import os
 
@@ -217,29 +215,10 @@ print(documents)
 
 
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from llama_index.core import Settings
-from llama_index.core import VectorStoreIndex
+#from llama_index.core import Settings
 
 embed_model = HuggingFaceEmbedding(
     model_name="BAAI/bge-small-en-v1.5"
 )
-
-index = VectorStoreIndex.from_documents(documents, embed_model=embed_model)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
