@@ -1,5 +1,6 @@
 # To read the PDF
 import PyPDF2
+from llmsherpa.readers import LayoutPDFReader
 # To analyze the PDF layout and extract text
 from pdfminer.high_level import extract_pages, extract_text
 from pdfminer.layout import LTTextContainer, LTChar, LTRect, LTFigure
@@ -10,13 +11,16 @@ from PIL import Image
 from pdf2image import convert_from_path
 # To perform OCR to extract text from images 
 import pytesseract 
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.core import Settings
+from llama_index.core import VectorStoreIndex,Document
 
 import os
 
 """https://towardsdatascience.com/extracting-text-from-pdf-files-with-python-a-comprehensive-guide-9fc4003d517"""
 
 # Function to Extract Text
-def text_extract(element):
+def text_extract(pdf_url_text):
 
     """Extracts text from the corpus, Checking if text is in LTTextContainer and LTChar.If yes extracting format for line
 
@@ -26,13 +30,16 @@ def text_extract(element):
     Returns:
       A tuple containing (extracted text, list of unique line formats). """
 
-    line_text = element.get_text() #Method of LTTEContrainer which extract words within the corpus box and store in a list
-    line_format = []  
-    for text_line in element:
-        if isinstance(text_line,LTTextContainer):
-            line_format = [(char.fontname,char.size) for char in text_line if isinstance(char,LTChar)]
-    format_per_line = list(set(line_format))
-    return (line_text, format_per_line)
+    llmsherpa_api_url = "https://readers.llmsherpa.com/api/document/developer/parseDocument?renderFormat=all"
+    pdf_url = pdf_url_text 
+    pdf_reader = LayoutPDFReader(llmsherpa_api_url)
+    doc = pdf_reader.read_pdf(pdf_url)
+    my_doc = []
+    for chunks in doc.chunks():
+        docs = Document(text = chunks.to_text()) 
+        my_doc.append(docs)
+    return my_doc
+  
 
 
 
@@ -129,16 +136,18 @@ def table_converter(table):
 #Adding All the Functions Together
     
 
-def final_extraction(pdf_path):
+def final_extraction(pdf_path,pdf_url):
+
+    documents = text_extract(pdf_url)
+    
     text_per_page = {}
     with open(pdf_path,'rb') as pdf_file:
         read_pdf = PyPDF2.PdfReader(pdf_file)
-    
         
         for pagenum, page in enumerate(extract_pages(pdf_path)):
             pageObj = read_pdf.pages[pagenum]
-            page_text,line_format,text_from_image,text_from_tables,page_content= [],[],[],[],[]
-             
+            text_from_image,text_from_tables= [],[]
+                
             table_num = 0
             first_element = True
             table_extraction_flag = False
@@ -158,15 +167,7 @@ def final_extraction(pdf_path):
             for i, component in enumerate(page_elements):
                 pos = component[0]  # Extracting Top Positions of Element
                 element = component[1]
-                
-                if isinstance(element, LTTextContainer): #For Text in PDF
-                    print("Found text container:", element)
-                    (line_text, format_per_line) = text_extract(element)
-                    page_text.append(line_text)
-                    line_format.append(format_per_line)
-                    
-
-                elif isinstance(element, LTFigure):
+                if isinstance(element, LTFigure):
                     print("Found figure:", element)
                     crop_image(element, pageObj)
                     convert_to_image('cropped_image.pdf')
@@ -198,19 +199,32 @@ def final_extraction(pdf_path):
                     
             # Add the extracted data to the dictionary
             text_per_page[pagenum] = {
-                "page_text": page_text,
                 "text_from_image": text_from_image,
                 "text_from_tables": text_from_tables,
                 }
+            
         
-        return text_per_page
+            
 
-pdf_path = r"C:\Users\asus\OneDrive\Desktop\GenAI\AdvancedRag\document-3a31866.pdf"
-extracted_data = final_extraction(pdf_path)
-
+        return documents,text_per_page
 
 
+pdf_url= "https://arxiv.org/abs/2402.19473"
+pdf_path = r"C:\Users\asus\OneDrive\Desktop\GenAI\AdvancedRag\2402.19473.pdf"
+documents,images_and_tables = final_extraction(pdf_path,pdf_url)
 
+print(documents)
+
+
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.core import Settings
+from llama_index.core import VectorStoreIndex
+
+embed_model = HuggingFaceEmbedding(
+    model_name="BAAI/bge-small-en-v1.5"
+)
+
+index = VectorStoreIndex.from_documents(documents, embed_model=embed_model)
 
 
 
