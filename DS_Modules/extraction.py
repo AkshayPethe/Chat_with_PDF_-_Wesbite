@@ -11,7 +11,9 @@ from PIL import Image
 from pdf2image import convert_from_path
 # To perform OCR to extract text from images 
 import pytesseract 
-
+from llama_index.core import VectorStoreIndex,Document
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+#from llama_index.core import Settings
 
 import os
 
@@ -137,88 +139,134 @@ def table_converter(table):
 def final_extraction(pdf_path,pdf_url):
 
     documents = text_extract(pdf_url)
+    return documents
     
-    text_per_page = {}
-    with open(pdf_path,'rb') as pdf_file:
-        read_pdf = PyPDF2.PdfReader(pdf_file)
+    # text_per_page = {}
+    # with open(pdf_path,'rb') as pdf_file:
+    #     read_pdf = PyPDF2.PdfReader(pdf_file)
         
-        for pagenum, page in enumerate(extract_pages(pdf_path)):
-            pageObj = read_pdf.pages[pagenum]
-            text_from_image,text_from_tables= [],[]
+    #     for pagenum, page in enumerate(extract_pages(pdf_path)):
+    #         pageObj = read_pdf.pages[pagenum]
+    #         text_from_image,text_from_tables= [],[]
                 
-            table_num = 0
-            first_element = True
-            table_extraction_flag = False
-            lower_side = 0
-            upper_side = 0
+    #         table_num = 0
+    #         first_element = True
+    #         table_extraction_flag = False
+    #         lower_side = 0
+    #         upper_side = 0
             
-            pdf = pdfplumber.open(pdf_path) #For Table Extraction
-            page_tables = pdf.pages[pagenum]
-            tables = page_tables.find_tables()
+    #         pdf = pdfplumber.open(pdf_path) #For Table Extraction
+    #         page_tables = pdf.pages[pagenum]
+    #         tables = page_tables.find_tables()
             
-            # Find the elements in PDF Object for each page.
-            page_elements = [(element.y1, element) for element in page._objs]
-            page_elements.sort(key=lambda x: x[0], reverse=True)  
-            """Sorting Acc to element.y1 as it ensure text is being shown as it is in PDF
-            From Top to Bottom using y1 = top cordinate of element
-            """
-            for i, component in enumerate(page_elements):
-                pos = component[0]  # Extracting Top Positions of Element
-                element = component[1]
-                if isinstance(element, LTFigure):
-                    print("Found figure:", element)
-                    crop_image(element, pageObj)
-                    convert_to_image('cropped_image.pdf')
-                    image_text = image_to_text("PDF_Image.png")
-                    text_from_image.append(image_text)
+    #         # Find the elements in PDF Object for each page.
+    #         page_elements = [(element.y1, element) for element in page._objs]
+    #         page_elements.sort(key=lambda x: x[0], reverse=True)  
+    #         """Sorting Acc to element.y1 as it ensure text is being shown as it is in PDF
+    #         From Top to Bottom using y1 = top cordinate of element
+    #         """
+    #         for i, component in enumerate(page_elements):
+    #             pos = component[0]  # Extracting Top Positions of Element
+    #             element = component[1]
+    #             if isinstance(element, LTFigure):
+    #                 print("Found figure:", element)
+    #                 crop_image(element, pageObj)
+    #                 convert_to_image('cropped_image.pdf')
+    #                 image_text = image_to_text("PDF_Image.png")
+    #                 text_from_image.append(image_text)
                     
 
-                elif isinstance(element, LTRect): #For Tables
-                    if first_element == True and (table_num+1)<=len(tables):
-                        print(page.bbox[3])
-                        lower_side = page.bbox[3] - tables[table_num].bbox[3]
-                        upper_side = element.y1
-                        table = extract_tables(pdf_path,pagenum,table_num)
-                        table_string = table_converter(table)
+    #             elif isinstance(element, LTRect): #For Tables
+    #                 if first_element == True and (table_num+1)<=len(tables):
+    #                     print(page.bbox[3])
+    #                     lower_side = page.bbox[3] - tables[table_num].bbox[3]
+    #                     upper_side = element.y1
+    #                     table = extract_tables(pdf_path,pagenum,table_num)
+    #                     table_string = table_converter(table)
 
-                        text_from_tables.append(table_string)
+    #                     text_from_tables.append(table_string)
                         
 
-                        table_extraction_flag = True
-                        first_element = False
-                    # Check if we already extracted the tables from the page
-                    if element.y0 >=lower_side and element.y1<=upper_side:
-                        pass
-                    elif not isinstance(page_elements[i+1][1],LTRect):
-                        table_extraction_flag = False
-                        first_element = True
-                        table_num+=1
+    #                     table_extraction_flag = True
+    #                     first_element = False
+    #                 # Check if we already extracted the tables from the page
+    #                 if element.y0 >=lower_side and element.y1<=upper_side:
+    #                     pass
+    #                 elif not isinstance(page_elements[i+1][1],LTRect):
+    #                     table_extraction_flag = False
+    #                     first_element = True
+    #                     table_num+=1
 
                     
-            # Add the extracted data to the dictionary
-            text_per_page[pagenum] = {
-                "text_from_image": text_from_image,
-                "text_from_tables": text_from_tables,
-                }
+    #         # Add the extracted data to the dictionary
+    #         text_per_page[pagenum] = {
+    #             "text_from_image": text_from_image,
+    #             "text_from_tables": text_from_tables,
+    #             }
             
         
             
 
-        return documents,text_per_page
+        
 
 
 pdf_url= "https://arxiv.org/abs/2402.19473"
 pdf_path = r"C:\Users\asus\OneDrive\Desktop\GenAI\AdvancedRag\2402.19473.pdf"
-documents,images_and_tables = final_extraction(pdf_path,pdf_url)
+documents = final_extraction(pdf_path,pdf_url)
 
 print(documents)
 
 
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-#from llama_index.core import Settings
 
 embed_model = HuggingFaceEmbedding(
     model_name="BAAI/bge-small-en-v1.5"
 )
 
 
+index = VectorStoreIndex.from_documents(documents, embed_model=embed_model)
+print(index)
+query_engine = index.as_query_engine()
+print(query_engine)
+response = query_engine.query("What did the author do growing up?")
+
+import torch
+from llama_index.core import PromptTemplate
+
+system_prompt = """<|SYSTEM|># StableLM Tuned (Alpha version)
+- StableLM is a helpful and harmless open-source AI language model developed by StabilityAI.
+- StableLM is excited to be able to help the user, but will refuse to do anything that could be considered harmful to the user.
+- StableLM is more than just an information source, StableLM is also able to write poetry, short stories, and make jokes.
+- StableLM will refuse to participate in anything that could harm a human.
+"""
+
+# This will wrap the default prompts that are internal to llama-index
+query_wrapper_prompt = PromptTemplate("<|USER|>{query_str}<|ASSISTANT|>")
+
+
+from llama_index.llms.huggingface import HuggingFaceLLM
+
+llm = HuggingFaceLLM(
+    context_window=2048,
+    max_new_tokens=256,
+    generate_kwargs={"temperature": 0.25, "do_sample": False},
+    query_wrapper_prompt=query_wrapper_prompt,
+    tokenizer_name="Writer/camel-5b-hf",
+    model_name="Writer/camel-5b-hf",
+    device_map="auto",
+    tokenizer_kwargs={"max_length": 2048},
+    # uncomment this if using CUDA to reduce memory usage
+    # model_kwargs={"torch_dtype": torch.float16}
+)
+
+Settings.chunk_size = 512
+Settings.llm = llm
+
+
+from llama_index.core import Settings
+import logging
+import sys
+
+logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+logging.getLogger().addHandler(logging.StreamHandler(stream=sys.stdout))
+chroma_client = chromadb.EphemeralClient()
+chroma_collection = chroma_client.create_collection("orca_paper")
