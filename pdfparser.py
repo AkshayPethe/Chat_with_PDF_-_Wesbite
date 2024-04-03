@@ -197,43 +197,33 @@ def final_extraction(pdf_path,pdf_url):
                 "text_from_tables": text_from_tables,
                 }
             
-        Documents = documents.append(text_per_page)
+        
             
 
-        return Documents
+        return documents,text_per_page
 
 
 pdf_url= "https://www.nvidia.com/content/dam/en-zz/Solutions/Data-Center/tesla-t4/t4-tensor-core-product-brief.pdf"
-pdf_path = r"C:\Users\asus\OneDrive\Desktop\GenAI\AdvancedRag\t4-tensor-core-product-brief.pdf"
+pdf_path = r"C:\Users\asus\OneDrive\Desktop\GenAI\AdvancedRag\2402.19473.pdf"
 print("*"*100)
-data = final_extraction(pdf_path,pdf_url)
-print("Data of Text and Images:",data)
-
-print(data)
+dat_doc,data_other = final_extraction(pdf_path,pdf_url)
+print("*"*100)
 
 
 
+from llama_index.core import Document
 
-from llama_index.core import VectorStoreIndex, SimpleDirectoryReader,Document
-path = r'C:\Users\asus\OneDrive\Desktop\GenAI\AdvancedRag\2307.06435.pdf'
-documents = SimpleDirectoryReader(path).load_data()
-print(len(documents))
-print(documents)
+llmsherpa_api_url = "https://readers.llmsherpa.com/api/document/developer/parseDocument?renderFormat=all"
+pdf_url = pdf_url_text 
+pdf_reader = LayoutPDFReader(llmsherpa_api_url)
+doc = pdf_reader.read_pdf(pdf_url)
+my_doc = []
+for chunks in doc.chunks():
+    docs = Document(text = chunks.to_text()) 
+    my_doc.append(docs)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+print("%"*100)
+print(my_doc)    
 
 
 
